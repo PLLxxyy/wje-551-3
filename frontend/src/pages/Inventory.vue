@@ -35,11 +35,19 @@ const activeSuppliers = computed(() => {
 });
 
 function isAlert(row: Inventory) {
-  return row.alertLevel !== InventoryAlertLevel.NORMAL;
+  return row.alertLevel !== InventoryAlertLevel.NORMAL && !row.resolvedByShipmentId;
+}
+
+function isResolved(row: Inventory) {
+  return !!row.resolvedByShipmentId;
 }
 
 function hasPendingReplenishment(row: Inventory) {
   return row.linkedShipmentIds && row.linkedShipmentIds.length > 0 && !row.resolvedByShipmentId;
+}
+
+function canReplenish(row: Inventory) {
+  return isAlert(row) && !hasPendingReplenishment(row);
 }
 
 function openReplenishmentDialog(row: Inventory) {
@@ -96,9 +104,10 @@ async function outbound(row: Inventory) {
       :data="store.inventories as any"
     >
       <template #alertLevel="{ row }">
-        <StatusBadge :value="row.alertLevel" />
+        <StatusBadge v-if="!isResolved(row)" :value="row.alertLevel" />
+        <span v-else class="resolved-badge">已冲销</span>
         <span v-if="hasPendingReplenishment(row)" class="replenish-tag">补货中</span>
-        <span v-if="row.resolvedByShipmentId" class="resolved-tag">已冲销</span>
+        <span v-if="isResolved(row)" class="resolved-tag">已完成</span>
       </template>
       <template #updatedAt="{ row }">{{ formatDate(row.updatedAt) }}</template>
       <template #actions="{ row }">
@@ -106,10 +115,10 @@ async function outbound(row: Inventory) {
           <button
             v-permission="PERMISSIONS.SHIPMENT_WRITE"
             class="mini replenish"
-            :disabled="hasPendingReplenishment(row)"
+            :disabled="!canReplenish(row)"
             @click="openReplenishmentDialog(row)"
           >
-            {{ hasPendingReplenishment(row) ? '补货中...' : '一键补货' }}
+            {{ hasPendingReplenishment(row) ? '补货进行中' : '一键补货' }}
           </button>
         </template>
         <template v-else>
@@ -182,6 +191,15 @@ async function outbound(row: Inventory) {
   color: #e65100;
   border-radius: 4px;
   font-size: 12px;
+}
+.resolved-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  background: #e8f5e9;
+  color: #2e7d32;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 500;
 }
 .resolved-tag {
   margin-left: 8px;

@@ -98,7 +98,14 @@ export class ShipmentsService {
   }
 
   cancel(id: string, user?: User) {
-    return this.transition(this.requireStatus(id, [ShipmentStatus.PENDING]), ShipmentStatus.CANCELLED, '取消运单', user);
+    const shipment = this.requireStatus(id, [ShipmentStatus.PENDING]);
+    shipment.items.forEach((item) => {
+      const inventory = inventories.find((inv) => inv.warehouseId === shipment.warehouseId && inv.skuId === item.skuId);
+      if (inventory) {
+        inventory.linkedShipmentIds = inventory.linkedShipmentIds.filter((sid) => sid !== shipment.id);
+      }
+    });
+    return this.transition(shipment, ShipmentStatus.CANCELLED, '取消运单', user);
   }
 
   private requireStatus(id: string, allowed: ShipmentStatus[]) {

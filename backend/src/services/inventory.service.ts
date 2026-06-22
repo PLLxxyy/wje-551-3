@@ -1,6 +1,6 @@
 import { v4 as uuid } from 'uuid';
-import { InventoryAlertLevel } from '../constants/enums.js';
-import { inventories, warehouses } from '../database/seeds/initial.js';
+import { InventoryAlertLevel, ShipmentStatus } from '../constants/enums.js';
+import { inventories, shipments, warehouses } from '../database/seeds/initial.js';
 import type { Inventory, User } from '../types/index.js';
 import { auditService } from './audit.service.js';
 import { shipmentsService } from './shipments.service.js';
@@ -38,6 +38,12 @@ export class InventoryService {
     const inventory = inventories.find((item) => item.id === inventoryId);
     if (!inventory) throw new BusinessException(404, '库存记录不存在');
     if (inventory.alertLevel === InventoryAlertLevel.NORMAL) throw new BusinessException(400, '该库存无预警，无需补货');
+    if (inventory.resolvedByShipmentId) throw new BusinessException(400, '该预警已通过补货运单冲销，无需再次补货');
+    const hasUnfinishedShipment = inventory.linkedShipmentIds.some((shipId) => {
+      const ship = shipments.find((s) => s.id === shipId);
+      return ship && [ShipmentStatus.PENDING, ShipmentStatus.SHIPPED, ShipmentStatus.IN_TRANSIT, ShipmentStatus.EXCEPTION].includes(ship.status);
+    });
+    if (hasUnfinishedShipment) throw new BusinessException(400, '该预警已有未完成的补货运单，不能重复创建');
     const replenishQuantity = Math.max(inventory.safetyStock - inventory.quantity, inventory.safetyStock * 0.5);
     const estimatedArrival = new Date(Date.now() + 7 * 86400000).toISOString();
     const shipment = shipmentsService.create({
