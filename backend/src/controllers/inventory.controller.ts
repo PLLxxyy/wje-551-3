@@ -11,6 +11,7 @@ export class InventoryController {
   transfer(req: Request, res: Response) { res.json(ok(inventoryService.transfer(req.body, resLocals(req).user))); }
   check(req: Request, res: Response) { res.json(ok(inventoryService.check(req.body, resLocals(req).user))); }
   safety(req: Request, res: Response) { res.json(ok(inventoryService.updateSafetyStock(req.params.id, Number(req.body.safetyStock), resLocals(req).user))); }
+  createReplenishment(req: Request, res: Response) { res.json(ok(inventoryService.createReplenishmentShipment(req.params.id, req.body.supplierId, resLocals(req).user))); }
 }
 
 export const inventoryController = new InventoryController();

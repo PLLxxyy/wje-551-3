@@ -3,6 +3,7 @@ import { InventoryAlertLevel } from '../constants/enums.js';
 import { inventories, warehouses } from '../database/seeds/initial.js';
 import type { Inventory, User } from '../types/index.js';
 import { auditService } from './audit.service.js';
+import { shipmentsService } from './shipments.service.js';
 import { BusinessException } from '../utils/response.js';
 import { assertPositiveInteger, assertRequired } from '../utils/validation.js';
 
@@ -27,10 +28,29 @@ export class InventoryService {
   findOrCreate(warehouseId: string, skuId: string, skuName: string) {
     let inventory = inventories.find((item) => item.warehouseId === warehouseId && item.skuId === skuId);
     if (!inventory) {
-      inventory = { id: uuid(), warehouseId, skuId, skuName, quantity: 0, safetyStock: 20, alertLevel: InventoryAlertLevel.CRITICAL, updatedAt: new Date().toISOString() };
+      inventory = { id: uuid(), warehouseId, skuId, skuName, quantity: 0, safetyStock: 20, alertLevel: InventoryAlertLevel.CRITICAL, linkedShipmentIds: [], updatedAt: new Date().toISOString() };
       inventories.push(inventory);
     }
     return inventory;
+  }
+
+  createReplenishmentShipment(inventoryId: string, supplierId: string, user?: User) {
+    const inventory = inventories.find((item) => item.id === inventoryId);
+    if (!inventory) throw new BusinessException(404, '库存记录不存在');
+    if (inventory.alertLevel === InventoryAlertLevel.NORMAL) throw new BusinessException(400, '该库存无预警，无需补货');
+    const replenishQuantity = Math.max(inventory.safetyStock - inventory.quantity, inventory.safetyStock * 0.5);
+    const estimatedArrival = new Date(Date.now() + 7 * 86400000).toISOString();
+    const shipment = shipmentsService.create({
+      supplierId,
+      warehouseId: inventory.warehouseId,
+      items: [{ skuId: inventory.skuId, skuName: inventory.skuName, quantity: Math.ceil(replenishQuantity) }],
+      estimatedArrival,
+      remark: `库存预警自动补货：${inventory.skuId}`,
+    }, user);
+    inventory.linkedShipmentIds.push(shipment.id);
+    this.refresh(inventory);
+    auditService.record({ action: 'CREATE', module: 'SHIPMENT', targetId: shipment.id, targetName: shipment.orderNo, detail: { source: 'INVENTORY_ALERT', inventoryId } }, user);
+    return shipment;
   }
 
   inbound(payload: { warehouseId: string; skuId: string; skuName: string; quantity: number }, user?: User) {

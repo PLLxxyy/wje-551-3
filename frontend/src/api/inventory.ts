@@ -9,4 +9,5 @@ export const inventoryApi = {
   transfer: (payload: unknown) => request.post('/inventory/transfer', payload),
   check: (payload: unknown) => request.post('/inventory/check', payload),
   safety: (id: string, safetyStock: number) => request.put(`/inventory/${id}/safety-stock`, { safetyStock }),
+  createReplenishment: (id: string, supplierId: string) => request.post(`/inventory/${id}/replenishment`, { supplierId }),
 };

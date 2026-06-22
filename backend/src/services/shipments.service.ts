@@ -1,7 +1,7 @@
 import { v4 as uuid } from 'uuid';
-import { ShipmentStatus, SupplierStatus } from '../constants/enums.js';
-import { shipments, suppliers, warehouses } from '../database/seeds/initial.js';
-import type { Shipment, User } from '../types/index.js';
+import { InventoryAlertLevel, ShipmentStatus, SupplierStatus } from '../constants/enums.js';
+import { inventories, shipments, suppliers, warehouses } from '../database/seeds/initial.js';
+import type { Shipment, ShipmentItemInput, User } from '../types/index.js';
 import { auditService } from './audit.service.js';
 import { inventoryService } from './inventory.service.js';
 import { BusinessException } from '../utils/response.js';
@@ -29,7 +29,7 @@ export class ShipmentsService {
     };
   }
 
-  create(payload: Pick<Shipment, 'supplierId' | 'warehouseId' | 'items' | 'estimatedArrival' | 'remark'>, user?: User) {
+  create(payload: { supplierId: string; warehouseId: string; items: ShipmentItemInput[]; estimatedArrival: string; remark?: string }, user?: User) {
     const supplier = suppliers.find((item) => item.id === payload.supplierId);
     if (!supplier) throw new BusinessException(404, '供应商不存在');
     if (supplier.status === SupplierStatus.BLACKLISTED) throw new BusinessException(400, '黑名单供应商不能创建新的运单');
@@ -49,6 +49,7 @@ export class ShipmentsService {
       remark: payload.remark ?? '',
       items: payload.items.map((item) => ({ ...item, id: uuid(), shipmentId })),
       timeline: [{ id: uuid(), status: ShipmentStatus.PENDING, operator: user?.name ?? '系统', note: '创建运单', createdAt: now }],
+      resolvedAlertIds: [],
       createdAt: now,
       updatedAt: now,
     };
@@ -72,7 +73,22 @@ export class ShipmentsService {
     const shipment = this.requireStatus(id, [ShipmentStatus.IN_TRANSIT]);
     shipment.items.forEach((item) => inventoryService.inbound({ warehouseId: shipment.warehouseId, skuId: item.skuId, skuName: item.skuName, quantity: item.quantity }, user));
     shipment.actualArrival = new Date().toISOString();
-    return this.transition(shipment, ShipmentStatus.DELIVERED, '签收并自动入库', user);
+    const resolvedAlerts = this.resolveInventoryAlerts(shipment, user);
+    shipment.resolvedAlertIds = resolvedAlerts;
+    return this.transition(shipment, ShipmentStatus.DELIVERED, '签收并自动入库，自动冲销预警', user);
+  }
+
+  private resolveInventoryAlerts(shipment: Shipment, user?: User): string[] {
+    const resolvedIds: string[] = [];
+    shipment.items.forEach((item) => {
+      const inventory = inventories.find((inv) => inv.warehouseId === shipment.warehouseId && inv.skuId === item.skuId);
+      if (inventory && inventory.linkedShipmentIds.includes(shipment.id)) {
+        inventory.resolvedByShipmentId = shipment.id;
+        resolvedIds.push(inventory.id);
+        auditService.record({ action: 'UPDATE', module: 'INVENTORY', targetId: inventory.id, targetName: inventory.skuId, detail: { type: 'ALERT_RESOLVED', shipmentId: shipment.id, shipmentOrderNo: shipment.orderNo } }, user);
+      }
+    });
+    return resolvedIds;
   }
 
   exception(id: string, reason: string, user?: User) {

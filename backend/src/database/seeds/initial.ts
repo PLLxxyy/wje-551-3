@@ -75,6 +75,7 @@ export const inventories: Inventory[] = Array.from({ length: 20 }, (_, index) =>
     quantity,
     safetyStock,
     alertLevel: alert(quantity, safetyStock),
+    linkedShipmentIds: [],
     updatedAt: now(),
   };
 });
@@ -100,6 +101,7 @@ export const shipments: Shipment[] = Array.from({ length: 15 }, (_, index) => {
       { id: uuid(), shipmentId: id, skuId: `SKU-${String(1010 + (index % 10))}`, skuName: '包装纸箱', quantity: 20 + index },
     ],
     timeline: [{ id: uuid(), status, operator: '系统种子', note: '初始化运单状态', createdAt }],
+    resolvedAlertIds: [],
     createdAt,
     updatedAt: createdAt,
   };

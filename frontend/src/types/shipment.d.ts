@@ -31,6 +31,7 @@ export interface Shipment {
   remark: string;
   items: ShipmentItem[];
   timeline: TimelineEvent[];
+  resolvedAlertIds: string[];
   supplier?: Supplier;
   warehouse?: Warehouse;
   createdAt: string;

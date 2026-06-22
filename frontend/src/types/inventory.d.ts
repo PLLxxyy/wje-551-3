@@ -19,5 +19,7 @@ export interface Inventory {
   quantity: number;
   safetyStock: number;
   alertLevel: InventoryAlertLevel;
+  linkedShipmentIds: string[];
+  resolvedByShipmentId?: string;
   updatedAt: string;
 }

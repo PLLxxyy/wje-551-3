@@ -51,15 +51,20 @@ export interface Inventory {
   quantity: number;
   safetyStock: number;
   alertLevel: InventoryAlertLevel;
+  linkedShipmentIds: string[];
+  resolvedByShipmentId?: string;
   updatedAt: string;
 }
 
-export interface ShipmentItem {
-  id: string;
-  shipmentId: string;
+export interface ShipmentItemInput {
   skuId: string;
   skuName: string;
   quantity: number;
+}
+
+export interface ShipmentItem extends ShipmentItemInput {
+  id: string;
+  shipmentId: string;
 }
 
 export interface Shipment {
@@ -75,6 +80,7 @@ export interface Shipment {
   remark: string;
   items: ShipmentItem[];
   timeline: TimelineEvent[];
+  resolvedAlertIds: string[];
   createdAt: string;
   updatedAt: string;
 }

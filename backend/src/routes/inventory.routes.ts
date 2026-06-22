@@ -13,3 +13,4 @@ inventoryRoutes.post('/outbound', requirePermission(PERMISSIONS.INVENTORY_WRITE)
 inventoryRoutes.post('/transfer', requirePermission(PERMISSIONS.INVENTORY_WRITE), (req, res) => inventoryController.transfer(req, res));
 inventoryRoutes.post('/check', requirePermission(PERMISSIONS.INVENTORY_WRITE), (req, res) => inventoryController.check(req, res));
 inventoryRoutes.put('/:id/safety-stock', requirePermission(PERMISSIONS.INVENTORY_WRITE), (req, res) => inventoryController.safety(req, res));
+inventoryRoutes.post('/:id/replenishment', requirePermission(PERMISSIONS.SHIPMENT_WRITE), (req, res) => inventoryController.createReplenishment(req, res));
